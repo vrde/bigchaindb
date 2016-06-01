@@ -138,6 +138,17 @@ class Bigchain(object):
         response = r.table('backlog').insert(signed_transaction, durability=durability).run(self.conn)
         return response
 
+    def get_stale_transactions(self):
+        """Get a RethinkDB cursor of stale transactions
+
+        Transactions are considered stale if they have been assigned a node, but are still in the
+        backlog after some amount of time specified in the configuration
+        """
+
+        return r.table('backlog')\
+            .filter(lambda tx: util.timestamp() - tx['transaction']['assignment_timestamp'] >
+                    self.backlog_reassign_delay).run(self.conn)
+
     def get_transaction(self, txid):
         """Retrieve a transaction with `txid` from bigchain.
 

@@ -132,7 +132,7 @@ class Bigchain(object):
 
         # update the transaction
         signed_transaction.update({'assignee': assignee})
-        signed_transaction.update({'assignment_timestamp': util.timestamp()})
+        signed_transaction.update({'assignment_timestamp': float(util.timestamp())})
 
         # write to the backlog
         response = r.table('backlog').insert(signed_transaction, durability=durability).run(self.conn)
@@ -146,7 +146,7 @@ class Bigchain(object):
         """
 
         return r.table('backlog')\
-            .filter(lambda tx: util.timestamp() - tx['transaction']['assignment_timestamp'] >
+            .filter(lambda tx: float(util.timestamp()) - tx['assignment_timestamp'] >
                     self.backlog_reassign_delay).run(self.conn)
 
     def get_transaction(self, txid):

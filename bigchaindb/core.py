@@ -138,6 +138,36 @@ class Bigchain(object):
         response = r.table('backlog').insert(signed_transaction, durability=durability).run(self.conn)
         return response
 
+    def reassign_transaction(self, transaction, durability='soft'):
+        """Assign a transaction to a new node
+
+        Args:
+            transaction (dict): assigned transaction
+
+        Returns:
+            dict: database response or None if no reassignment is possible
+        """
+
+        if self.federation_nodes:
+            try:
+                index_current_assignee = self.federation_nodes.index(transaction['assignee'])
+                new_assignee = random.choice(self.federation_nodes[:index_current_assignee] +
+                                             self.federation_nodes[index_current_assignee + 1:])
+            except ValueError:
+                # current assignee not in federation
+                new_assignee = random.choice(self.federation_nodes)
+
+        else:
+            # There is no other node to assign to, nothing to do
+            return None
+
+        response = r.table('backlog')\
+            .get(transaction['id'])\
+            .update({'assignee': new_assignee,
+                     'assignment_timestamp': float(util.timestamp())},
+                    durability=durability).run(self.conn)
+        return response
+
     def get_stale_transactions(self):
         """Get a RethinkDB cursor of stale transactions
 

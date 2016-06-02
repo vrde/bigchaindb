@@ -8,6 +8,7 @@ import bigchaindb
 from bigchaindb import Bigchain
 from bigchaindb.monitor import Monitor
 from bigchaindb.util import ProcessGroup
+from time import sleep
 
 
 logger = logging.getLogger(__name__)
@@ -229,3 +230,62 @@ class Block(object):
         p_write.start()
         p_delete.start()
 
+
+class StaleTransactionMonitor(object):
+
+    def __init__(self):
+        b = Bigchain()
+        self.backlog_reassign_check = b.backlog_reassign_delay
+
+        # a sentinel queue just for the kill signal
+        self.q_sentinel = mp.Queue()
+
+        self.q_tx_to_reassign = mp.Queue()
+
+    def check_transactions(self):
+        b = Bigchain()
+
+        while True:
+            try:
+                # as not to spam the database with reads
+                sentinel = self.q_sentinel.get(timeout=5)
+                if sentinel == 'stop':
+                    # there are more reassignment processes than checking processes
+                    for i in range(mp.cpu_count()):
+                        self.q_tx_to_reassign.put('stop')
+                    return
+
+            except queue.Empty:
+                # this is expected, continue execution
+                pass
+
+            curs = b.get_stale_transactions()
+
+            for tx in curs:
+                self.q_tx_to_reassign.put(tx)
+
+    def reassign_transactions(self):
+        b = Bigchain()
+
+        while True:
+            tx = self.q_tx_to_reassign.get()
+            if tx == 'stop':
+                return
+
+            b.reassign_transaction(tx)
+
+    def kill(self):
+        for i in range(mp.cpu_count()):
+            self.q_sentinel.put('stop')
+
+    def start(self):
+        # a single stale transaction monitor is enough
+        p_stale_transaction_check = ProcessGroup(name='stale_transactions',
+                                                 target=self.check_transactions,
+                                                 concurrency=1)
+
+        p_reassign_transactions = ProcessGroup(name='reassign_transactions',
+                                               target=self.reassign_transactions)
+
+        p_stale_transaction_check.start()
+        p_reassign_transactions.start()

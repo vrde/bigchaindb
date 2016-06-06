@@ -13,7 +13,7 @@ from bigchaindb import util
 from bigchaindb import exceptions
 from bigchaindb import crypto
 from bigchaindb.voter import Voter
-from bigchaindb.block import Block, BlockDeleteRevert
+from bigchaindb.block import Block, BlockDeleteRevert, StaleTransactionMonitor
 
 
 @pytest.mark.skipif(reason='Some tests throw a ResourceWarning that might result in some weird '
@@ -838,6 +838,50 @@ class TestBigchainBlock(object):
     def test_duplicated_transactions(self):
         pytest.skip('We may have duplicates in the initial_results and changefeed')
 
+
+class TestStaleTransactionMonitor(object):
+    def test_reassignment(self, b, user_sk, user_vk):
+        b.federation_nodes = ['aaa', 'bbb', 'ccc']
+
+        tx = b.create_transaction(b.me, user_vk, None, 'CREATE')
+        tx = b.sign_transaction(tx, b.me_private)
+        b.write_transaction(tx)
+        b.reassign_transaction(tx)
+
+        tx_updated = r.table('backlog').get(tx['id']).run(b.conn)
+
+        assert tx_updated['assignee'] != tx['assignee']
+        assert tx_updated['assignment_timestamp'] > tx['assignment_timestamp']
+
+    def test_get_stale(self, b, user_sk, user_vk):
+        b.backlog_reassign_delay = 1
+
+        tx = b.create_transaction(b.me, user_vk, None, 'CREATE')
+        tx = b.sign_transaction(tx, b.me_private)
+        b.write_transaction(tx)
+
+        time.sleep(2)
+
+        tx_stale = list(b.get_stale_transactions())[0]
+
+        assert tx == tx_stale
+
+
+    def test_unresponsive_node(self, b, user_sk, user_vk):
+        stm = StaleTransactionMonitor(timeout=1)
+        b.backlog_reassign_delay = 1
+
+        tx = b.create_transaction(b.me, user_vk, None, 'CREATE')
+        tx = b.sign_transaction(tx, b.me_private)
+        b.write_transaction(tx)
+
+        stm.start()
+        time.sleep(32)
+        stm.kill()
+
+        tx_updated = r.table('backlog').get(tx['id']).run(b.conn)
+        assert tx_updated['assignment_timestamp'] > tx['assignment_timestamp']
+        assert tx_updated['assignee'] != tx['assignee']
 
 class TestMultipleInputs(object):
     def test_transfer_single_owners_single_input(self, b, user_sk, user_vk, inputs):

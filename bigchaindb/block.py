@@ -233,9 +233,8 @@ class Block(object):
 
 class StaleTransactionMonitor(object):
 
-    def __init__(self):
-        b = Bigchain()
-        self.backlog_reassign_check = b.backlog_reassign_delay
+    def __init__(self, timeout=5):
+        self.timeout = timeout
 
         # a sentinel queue just for the kill signal
         self.q_sentinel = mp.Queue()
@@ -248,7 +247,7 @@ class StaleTransactionMonitor(object):
         while True:
             try:
                 # as not to spam the database with reads
-                sentinel = self.q_sentinel.get(timeout=5)
+                sentinel = self.q_sentinel.get(timeout=self.timeout)
                 if sentinel == 'stop':
                     # there are more reassignment processes than checking processes
                     for i in range(mp.cpu_count()):

@@ -289,3 +289,43 @@ class StaleTransactionMonitor(object):
 
         p_stale_transaction_check.start()
         p_reassign_transactions.start()
+
+
+class BlockDeleteRevert(object):
+
+    def __init__(self, q_delete_to_revert):
+        self.q_delete_to_revert = q_delete_to_revert
+
+    def write_blocks(self):
+        """
+        Write blocks to the bigchain
+        """
+
+        # create bigchain instance
+        b = Bigchain()
+
+        # Write blocks
+        while True:
+            block = self.q_delete_to_revert.get()
+
+            # poison pill
+            if block == 'stop':
+                return
+
+            b.write_block(block)
+
+    def kill(self):
+        for i in range(mp.cpu_count()):
+            self.q_delete_to_revert.put('stop')
+
+    def start(self):
+        """
+        Initialize, spawn, and start the processes
+        """
+
+        # initialize the processes
+        p_write = ProcessGroup(name='write_blocks', target=self.write_blocks)
+
+        # start the processes
+        p_write.start()
+

@@ -866,17 +866,24 @@ class TestStaleTransactionMonitor(object):
 
         assert tx == tx_stale
 
-
     def test_unresponsive_node(self, b, user_sk, user_vk):
+        from bigchaindb import config_utils, Bigchain
+        import multiprocessing as mp
+        # config_utils.set_config(
+        #     {
+        #         'keyring': ['aaa', 'bbb', 'ccc'],
+        #         'backlog_reassign_delay': 1
+        #     })
+        # b.federation_nodes = ['aaa', 'bbb', 'ccc']
+        # b.backlog_reassign_delay = 1
         stm = StaleTransactionMonitor(timeout=1)
-        b.backlog_reassign_delay = 1
 
         tx = b.create_transaction(b.me, user_vk, None, 'CREATE')
-        tx = b.sign_transaction(tx, b.me_private)
+        #tx = b.sign_transaction(tx, b.me_private)
         b.write_transaction(tx)
 
         stm.start()
-        time.sleep(32)
+        time.sleep(3)
         stm.kill()
 
         tx_updated = r.table('backlog').get(tx['id']).run(b.conn)

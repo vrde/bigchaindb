@@ -173,7 +173,7 @@ class Block(object):
         q_initial = mp.Queue()
 
         # get initial results
-        initial_results = r.table('backlog')\
+        initial_results = r.table('backlog', read_mode=b.read_mode)\
             .between([b.me, r.minval], [b.me, r.maxval], index='assignee__transaction_timestamp')\
             .order_by(index=r.asc('assignee__transaction_timestamp'))\
             .run(b.conn)

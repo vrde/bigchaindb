@@ -13,13 +13,19 @@ from bigchaindb.util import (
 
 
 class TransactionType(Enum):
-    create = 'CREATE'
-    transfer = 'TRANSFER'
+    CREATE = 0
+    TRANSFER = 1
+
+    def __str__(self):
+        return str(self.name)
+
+    def __repr__(self):
+        return str(self.name)
 
 
 class Fulfillment(object):
 
-    def __init__(self, fid=None, owners_before=[], tx_input=None):
+    def __init__(self, owners_before=[], fid=0, tx_input=None):
         """Create a new fulfillment
 
         Args:
@@ -29,8 +35,11 @@ class Fulfillment(object):
 
         """
         self.fid = fid
-        self.owners_before = owners_before
         self.tx_input = tx_input
+        if not isinstance(owners_before, list):
+            raise TypeError('`owners_before` must be an instance of list')
+        else:
+            self.owners_before = owners_before
 
     def to_dict(self):
         # `operation`: TRANSFER
@@ -47,13 +56,13 @@ class Fulfillment(object):
                 'owners_before': self.owners_before,
                 'input': None,
                 'fulfillment': None,
-                'fid': 0
+                'fid': self.fid
             }
 
 
 class Condition(object):
 
-    def __init__(self, fid, owners_after=[]):
+    def __init__(self, owners_after=[], fid=0):
         """Create a new condition for a fulfillment
 
         Args
@@ -63,9 +72,12 @@ class Condition(object):
 
         """
         self.fid = fid
-        self.owners_after = owners_after
+        if not isinstance(owners_after, list):
+            raise TypeError('`owners_after` must be an instance of list')
+        else:
+            self.owners_after = owners_after
 
-    def __gen_condition(self):
+    def _gen_condition(self):
         # NOTE: I have no clue why we're instantiating `Fulfillments` here but then
         # it's a condition in the end
         owners_after_count= len(self.owners_after)
@@ -86,7 +98,8 @@ class Condition(object):
         return fulfillment
 
     def to_dict(self):
-        condition = self.__gen_condition()
+        # TODO: Rename to "condition"
+        condition = self._gen_condition()
 
         if condition:
             return {
@@ -102,7 +115,7 @@ class Condition(object):
 class Transaction(object):
     VERSION = 1
 
-    def __init__(self, fulfillments, conditions, payload=None):
+    def __init__(self, fulfillments, conditions, operation, payload=None):
         """Create a new transaction in memory
 
         A transaction in BigchainDB is a transfer of a digital asset between two entities represented
@@ -124,6 +137,7 @@ class Transaction(object):
             # TODO: Write a description here
             fulfillments
             conditions
+            operation
             payload (Optional[dict]): dictionary with information about asset.
 
         Raises:
@@ -131,22 +145,35 @@ class Transaction(object):
 
 
         """
-        self.fulfillments = fulfillments
-        self.conditions = conditions
+        self.operation = operation
+
+        if not isinstance(fulfillments, list):
+            raise TypeError('`fulfillments` must be an instance of list')
+        else:
+            self.fulfillments = fulfillments
+        if not isinstance(conditions, list):
+            raise TypeError('`conditions` must be an instance of list')
+        else:
+            self.conditions = conditions
+
         # Check if payload is either None or a dict. Otherwise throw
         if payload is not None and not isinstance(payload, dict):
             raise TypeError('`payload` must be an dict instance or None')
         else:
             self.payload = payload
 
-        self.operation = TransactionType.transfer if self.inputs else TransactionType.create
+    def sign(self, signing_keys):
+        pass
+
+    def write(self):
+        pass
 
     def to_dict(self):
         transaction = {
-            'fulfillments': self.fulfillments.to_dict(),
-            'conditions': self.conditions.to_dict(),
+            'fulfillments': [fulfillment.to_dict() for fulfillment in self.fulfillments],
+            'conditions': [condition.to_dict() for condition in self.conditions],
             # TODO: `operation` needs to be serialized correctly with an EnumSerializer
-            'operation': self.operation,
+            'operation': str(self.operation),
             'timestamp': timestamp(),
             'data': {
                 'uuid': str(uuid4()),

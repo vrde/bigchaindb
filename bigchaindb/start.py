@@ -8,6 +8,7 @@ import setproctitle
 import bigchaindb
 from bigchaindb.lib import BigchainDB
 from bigchaindb.core import App
+from bigchaindb.experimental.core import ParallelValidationApp
 from bigchaindb.web import server, websocket_server
 from bigchaindb import event_stream
 from bigchaindb.events import Exchange, EventTypes
@@ -35,7 +36,7 @@ BANNER = """
 """
 
 
-def start():
+def start(args):
     # Exchange object for event stream api
     logger.info('Starting BigchainDB')
     exchange = Exchange()
@@ -48,7 +49,14 @@ def start():
     p_webapi.start()
 
     # start message
-    logger.info(BANNER.format(bigchaindb.config['server']['bind']))
+    if args.experimental_parallel_validation:
+        global BANNER
+        BANNER = BANNER.replace('"fluffy cat"            ',
+                                '"REALLY REALLY FAST CAT"')
+        BANNER = BANNER.replace('**', '💀')
+        BANNER = BANNER.replace('*', '💀')
+
+    print(BANNER.format(bigchaindb.config['server']['bind']))
 
     # start websocket server
     p_websocket_server = Process(name='bigchaindb_ws',
@@ -68,7 +76,11 @@ def start():
     setproctitle.setproctitle('bigchaindb')
 
     # Start the ABCIServer
-    app = ABCIServer(app=App(exchange.get_publisher_queue()))
+    if args.experimental_parallel_validation:
+        app = ABCIServer(app=ParallelValidationApp(exchange.get_publisher_queue()))
+    else:
+        app = ABCIServer(app=App())
+        app = ABCIServer(app=App(exchange.get_publisher_queue()))
     app.run()
 
 

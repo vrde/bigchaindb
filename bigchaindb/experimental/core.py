@@ -12,6 +12,10 @@ class ParallelValidationApp(App):
         self.parallel_validator = ParallelValidator()
         self.parallel_validator.start()
 
+    def check_tx(self, raw_transaction):
+        # Skip check_tx
+        return ResponseCheckTx(code=CodeTypeOk)
+
     def deliver_tx(self, raw_transaction):
         self.parallel_validator.validate(raw_transaction)
         return ResponseDeliverTx(code=CodeTypeOk)

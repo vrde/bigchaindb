@@ -249,7 +249,7 @@ class App(BaseApplication):
 
         block = {'height': self.new_height,
                  'transactions': self.block_transactions}
-        event = Event(EventTypes.BLOCK_VALID, new_block)
+        event = Event(EventTypes.BLOCK_VALID, block)
         self.events_queue.put(event)
 
         return ResponseCommit(data=data)

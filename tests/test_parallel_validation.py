@@ -21,7 +21,7 @@ def generate_create_and_transfer(keypair=None):
 
 def test_validation_worker_process_multiple_transactions(b):
     import multiprocessing as mp
-    from bigchaindb.experimental.utils import ValidationWorker, RESET, EXIT
+    from bigchaindb.parallel_validation import ValidationWorker, RESET, EXIT
 
     keypair = generate_key_pair()
     create_tx, transfer_tx = generate_create_and_transfer(keypair)
@@ -69,7 +69,7 @@ def test_parallel_validator_routes_transactions_correctly(b, monkeypatch):
     import os
     import multiprocessing as mp
     from json import dumps
-    from bigchaindb.experimental.utils import ParallelValidator
+    from bigchaindb.parallel_validation import ParallelValidator
 
     # We want to make sure that the load is distributed across all workers.
     # Since introspection on an object running on a different process is
@@ -84,7 +84,7 @@ def test_parallel_validator_routes_transactions_correctly(b, monkeypatch):
         return dict_transaction
 
     monkeypatch.setattr(
-        'bigchaindb.experimental.utils.ValidationWorker.validate',
+        'bigchaindb.parallel_validation.ValidationWorker.validate',
         validate)
 
     # Transaction routing uses the `id` of the transaction. This test strips
@@ -100,7 +100,7 @@ def test_parallel_validator_routes_transactions_correctly(b, monkeypatch):
     # times.
     # Note that the `ParallelValidator.result` call resets the object, and
     # makes it ready to validate a new set of transactions.
-    for _ in range(10):
+    for _ in range(2):
         for transaction in transactions:
             pv.validate(dumps(transaction).encode('utf8'))
         # We expect the result to have the same order as the input data.

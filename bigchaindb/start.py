@@ -8,7 +8,7 @@ import setproctitle
 import bigchaindb
 from bigchaindb.lib import BigchainDB
 from bigchaindb.core import App
-from bigchaindb.experimental.core import ParallelValidationApp
+from bigchaindb.parallel_validation import ParallelValidationApp
 from bigchaindb.web import server, websocket_server
 from bigchaindb import event_stream
 from bigchaindb.events import Exchange, EventTypes
@@ -47,14 +47,6 @@ def start(args):
         bigchaindb_factory=BigchainDB)
     p_webapi = Process(name='bigchaindb_webapi', target=app_server.run, daemon=True)
     p_webapi.start()
-
-    # start message
-    if args.experimental_parallel_validation:
-        global BANNER
-        BANNER = BANNER.replace('"fluffy cat"            ',
-                                '"REALLY REALLY FAST CAT"')
-        BANNER = BANNER.replace('**', '💀')
-        BANNER = BANNER.replace('*', '💀')
 
     print(BANNER.format(bigchaindb.config['server']['bind']))
 

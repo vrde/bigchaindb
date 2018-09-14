@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: (Apache-2.0 AND CC-BY-4.0)
 # Code is Apache-2.0 and docs are CC-BY-4.0
 
-import multiprocessing as mp
 from collections import defaultdict
+import logging
+import multiprocessing as mp
 
 from abci.types_pb2 import ResponseCheckTx, ResponseDeliverTx
 
@@ -11,7 +12,10 @@ from bigchaindb import BigchainDB, App
 from bigchaindb.tendermint_utils import decode_transaction
 
 
+logger = logging.getLogger(__name__)
+
 CodeTypeOk = 0
+CodeTypeError = 1
 
 
 class ParallelValidationApp(App):
@@ -19,22 +23,28 @@ class ParallelValidationApp(App):
         super().__init__(bigchaindb, events_queue)
         self.parallel_validator = ParallelValidator()
         self.parallel_validator.start()
+        self.is_asynchronous = True
 
     def check_tx(self, raw_transaction):
         return ResponseCheckTx(code=CodeTypeOk)
 
-    def deliver_tx(self, raw_transaction):
+    def deliver_tx_async(self, raw_transaction):
         self.parallel_validator.validate(raw_transaction)
-        return ResponseDeliverTx(code=CodeTypeOk)
 
-    def end_block(self, request_end_block):
+    def deliver_tx_responses(self):
+        if not self.begin_block_timer:
+            return []
         result = self.parallel_validator.result(timeout=30)
+        responses = []
+        self.transactions_count = len(result)
         for transaction in result:
             if transaction:
                 self.block_txn_ids.append(transaction.id)
                 self.block_transactions.append(transaction)
-
-        return super().end_block(request_end_block)
+                responses.append(ResponseDeliverTx(code=CodeTypeOk))
+            else:
+                responses.append(ResponseDeliverTx(code=CodeTypeError))
+        return responses
 
 
 RESET = 'reset'

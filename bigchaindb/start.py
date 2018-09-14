@@ -31,6 +31,11 @@ BANNER = """
 *                                                                          *
 *   Listening to client connections on: {:<15}                    *
 *                                                                          *
+****************************************************************************\
+"""
+
+EXPERIMENTAL = """\
+*                 💀  Experimental Parallel Validation  💀                 *
 ****************************************************************************
 """
 
@@ -47,7 +52,11 @@ def start(args):
     p_webapi = Process(name='bigchaindb_webapi', target=app_server.run, daemon=True)
     p_webapi.start()
 
-    logger.info(BANNER.format(bigchaindb.config['server']['bind']))
+    print(BANNER.format(bigchaindb.config['server']['bind']))
+    if args.experimental_parallel_validation:
+        print(EXPERIMENTAL)
+    else:
+        print()
 
     # start websocket server
     p_websocket_server = Process(name='bigchaindb_ws',
@@ -68,9 +77,10 @@ def start(args):
 
     # Start the ABCIServer
     if args.experimental_parallel_validation:
-        app = ABCIServer(app=ParallelValidationApp(events_queue=exchange.get_publisher_queue()))
+        AppClass = ParallelValidationApp
     else:
-        app = ABCIServer(app=App(events_queue=exchange.get_publisher_queue()))
+        AppClass = App
+    app = ABCIServer(app=AppClass(events_queue=exchange.get_publisher_queue()))
     app.run()
 
 

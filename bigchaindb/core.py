@@ -7,6 +7,7 @@ with Tendermint.
 """
 import logging
 import sys
+from time import time
 
 from abci.application import BaseApplication
 from abci.types_pb2 import (
@@ -173,6 +174,8 @@ class App(BaseApplication):
 
         self.block_txn_ids = []
         self.block_transactions = []
+        self.transactions_count = 0
+        self.begin_block_timer = time()
         return ResponseBeginBlock()
 
     def deliver_tx(self, raw_transaction):
@@ -184,10 +187,12 @@ class App(BaseApplication):
 
         self.abort_if_abci_chain_is_not_synced()
 
+
         logger.debug('deliver_tx: %s', raw_transaction)
         transaction = self.bigchaindb.is_valid_transaction(
             decode_transaction(raw_transaction), self.block_transactions)
 
+        self.transactions_count += 1
         if not transaction:
             logger.debug('deliver_tx: INVALID')
             return ResponseDeliverTx(code=CodeTypeError)
@@ -206,6 +211,10 @@ class App(BaseApplication):
         """
 
         self.abort_if_abci_chain_is_not_synced()
+        if self.begin_block_timer:
+            logger.info('Block with %s txs validated in %.3f',
+                        self.transactions_count,
+                        time() - self.begin_block_timer)
 
         chain_shift = 0 if self.chain is None else self.chain['height']
 
